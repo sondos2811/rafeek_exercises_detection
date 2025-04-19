@@ -8,11 +8,13 @@ import body_model_2
 import arm_model_home
 import hand_model_home
 import hand_model_center
+import os
 
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.DEBUG)
-
+PORT = os.getenv("PORT", 5000)  # Railway assigns a PORT env var
+app.run(host='0.0.0.0', port=PORT)
 @app.route('/start_exercise/<mode>/<child_id>/<exercise_name>', methods=['GET'])
 def start_exercise(mode, child_id, exercise_name):
     logging.debug(f"Request received: mode={mode}, child_id={child_id}, exercise_name={exercise_name}")
