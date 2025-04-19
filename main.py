@@ -2,69 +2,71 @@ from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import time
 import logging
+import os
 
 # Import your models
 import body_model_2
 import arm_model_home
 import hand_model_home
 import hand_model_center
-import os
 
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.DEBUG)
-PORT = os.getenv("PORT", 5000)  # Railway assigns a PORT env var
-app.run(host='0.0.0.0', port=PORT)
+
+# Default port handling
+PORT = int(os.getenv("PORT", 5000))  # Ensure PORT is an integer
+
 @app.route('/start_exercise/<mode>/<child_id>/<exercise_name>', methods=['GET'])
 def start_exercise(mode, child_id, exercise_name):
+    """
+    Route to start an exercise based on the mode, child ID, and exercise name.
+    """
     logging.debug(f"Request received: mode={mode}, child_id={child_id}, exercise_name={exercise_name}")
     try:
         if mode == 'body':
-            return Response(start_body_v1(child_id, exercise_name), mimetype='multipart/x-mixed-replace; boundary=frame')
+            return generate_response(body_model_2, child_id, exercise_name)
         elif mode == 'arm':
-            return Response(start_arm(child_id, exercise_name, request.args.get('side', None)), mimetype='multipart/x-mixed-replace; boundary=frame')
+            return generate_response(arm_model_home, child_id, exercise_name, request.args.get('side'))
         elif mode == 'hand':
-            return Response(start_hand(child_id, exercise_name, request.args.get('side', None)), mimetype='multipart/x-mixed-replace; boundary=frame')
+            return generate_response(hand_model_home, child_id, exercise_name, request.args.get('side'))
         elif mode == 'center':
-            return Response(start_center(exercise_name), mimetype='multipart/x-mixed-replace; boundary=frame')
+            return generate_response(hand_model_center, None, exercise_name)
         else:
+            logging.warning(f"Invalid mode: {mode}")
             return jsonify({"error": "Invalid mode"}), 400
     except Exception as e:
         logging.error(f"Error occurred: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
+def generate_response(model, child_id, exercise_name, side=None):
+    """
+    Helper function to initialize the model and generate a video feed response.
+    """
+    initialize_model(model, child_id, exercise_name, side)
+    return Response(model.generate_video_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-def start_body_v1(child_id, exercise_name):
-    body_model_2.exercise = exercise_name
-    body_model_2.child_id = child_id
-    body_model_2.start_time = time.time()
-    body_model_2.distance_threshold_close, body_model_2.distance_threshold_far = body_model_2.exercises[exercise_name].values()
-    
-    return body_model_2.generate_video_feed()
+def initialize_model(model, child_id, exercise_name, side=None):
+    """
+    Initializes the model with common attributes.
+    """
+    model.exercise = exercise_name
+    model.start_time = time.time()
+    if hasattr(model, 'child_id') and child_id:
+        model.child_id = child_id
+    if hasattr(model, 'side') and side:
+        model.side = side
+    if hasattr(model, 'exercise_active'):
+        model.exercise_active = False
+    if hasattr(model, 'max_duration'):
+        model.max_duration = 120
+    if hasattr(model, 'distance_threshold_close') and hasattr(model, 'distance_threshold_far'):
+        thresholds = model.exercises.get(exercise_name, {})
+        model.distance_threshold_close = thresholds.get('distance_threshold_close')
+        model.distance_threshold_far = thresholds.get('distance_threshold_far')
 
-
-def start_arm(child_id, exercise_name , side=None):
-    arm_model_home.exercise = exercise_name
-    arm_model_home.child_id = child_id
-    arm_model_home.start_time = time.time()
-    if side:
-        arm_model_home.side = side  # Only set if side param is provided
-    return arm_model_home.generate_video_feed()
-
-
-def start_hand(child_id , exercise_name , side = None):
-    hand_model_home.exercise = exercise_name
-    hand_model_home.child_id = child_id
-    hand_model_home.start_time = time.time()
-    hand_model_home.exercise_active = False
-    hand_model_home.max_duration = 120
-    return hand_model_home.generate_video_feed()
-
-def start_center(exercise_name):
-    hand_model_center.exercise = exercise_name
-    hand_model_center.start_time = time.time()  # Uncommented and initialized
-    hand_model_center.exercise_active = False
-    hand_model_center.max_duration = 120  # Uncommented and initialized
-    return hand_model_center.generate_video_feed()
+if __name__ == "__main__":
+    # For development only. Use a WSGI server like Gunicorn for production.
+    app.run(host='0.0.0.0', port=PORT)
 
 
