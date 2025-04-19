@@ -66,12 +66,3 @@ def start_center(exercise_name):
     return hand_model_center.generate_video_feed()
 
 
-if __name__ == '__main__':
-    # Test start_body_v1
-    print(start_body_v1("123", "exercise1"))
-    # Test start_arm
-    print(start_arm("123", "exercise1", "left"))
-    # Test start_hand
-    print(start_hand("123", "exercise1", "right"))
-    # Test start_center
-    print(start_center("exercise1"))
