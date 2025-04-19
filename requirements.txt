@@ -3,6 +3,7 @@ uvicorn[standard]
 flask
 flask-cors
 opencv-python
+opencv-python-headless
 numpy
 torch
 mediapipe
